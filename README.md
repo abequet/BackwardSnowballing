@@ -2,12 +2,14 @@
 
 A client-side web tool for **backward and forward snowballing** in systematic reviews. Given a DOI, a PDF, or both, it extracts referenced articles (backward) and citing articles (forward) with titles, authors, years, and clickable DOIs.
 
+**No account, no API key, no server — just open and go.**
+
 ## Features
 
-- **Backward citation chasing** — extracts all references cited by an article
-- **Forward citation chasing** — finds all articles that cite the input article (via OpenAlex & Semantic Scholar)
-- **DOI lookup** — queries Crossref, OpenAlex & Semantic Scholar APIs simultaneously, picks the best source and supplements with unique refs from the others
-- **PDF extraction** — parses reference sections from PDFs using pdf.js, with support for:
+- **Backward snowballing** — extracts all references cited by an article
+- **Forward snowballing** — finds all articles that cite the input article (via OpenAlex & Semantic Scholar)
+- **DOI lookup** — queries Crossref, OpenAlex & Semantic Scholar simultaneously, picks the best source and supplements with unique refs from the others
+- **PDF extraction** — parses reference sections directly from PDFs using pdf.js, with support for:
   - Two-column layouts (auto-detected)
   - APA author-year format
   - Vancouver numbered format
@@ -15,31 +17,35 @@ A client-side web tool for **backward and forward snowballing** in systematic re
 - **Cross-check & merge** — when both DOI and PDF are provided, the tool merges both reference sets, filling gaps from each source
 - **DOI resolution** — references without a DOI are automatically looked up via the Crossref bibliographic search API
 - **Batch processing** — paste multiple DOIs and process them all sequentially, with per-article tabs and combined export
-- **Export** — RIS (Zotero/Mendeley/EndNote compatible), CSV, or copy all DOIs to clipboard
-- **Zotero integration** — embedded COinS metadata for direct import via the Zotero browser connector
+- **Advanced filters** — filter results by text search, author name, and year range
+- **Export** — RIS (Zotero/Mendeley/EndNote compatible), CSV, or copy all DOIs to clipboard. Exports respect active filters.
+- **Zotero integration** — embedded COinS metadata for direct multi-item import via the Zotero browser connector
 - **Article info card** — displays metadata (title, authors, journal, year) of the article being analyzed
-- **Zero setup** — no account, no API key, no server. Everything runs client-side in the browser.
+- **Zero setup** — everything runs client-side in the browser. No data is sent to any server other than the public APIs listed below.
 
 ## How it works
 
 ```
-┌──────────┐     ┌──────────────┐
-│  DOI     │────▶│  Crossref    │
-│  input   │     │  OpenAlex    │──┐
-└──────────┘     │  Sem.Scholar │  │
-                 └──────────────┘  │
-                                   ▼
-┌──────────┐     ┌──────────────┐  ┌─────────────┐     ┌──────────┐
-│  PDF     │────▶│  pdf.js      │──▶│  Cross-check │────▶│ Results  │
-│  upload  │     │  ref parser  │  │  & merge     │     │ + enrich │
-└──────────┘     └──────────────┘  └─────────────┘     └──────────┘
+┌──────────┐     ┌──────────────────┐
+│  DOI     │────▶│  Crossref        │
+│  input   │     │  OpenAlex        │──┐
+└──────────┘     │  Semantic Scholar │  │
+                 └──────────────────┘  │
+                                       ▼
+┌──────────┐     ┌──────────────┐  ┌───────────────┐     ┌──────────┐
+│  PDF     │────▶│  pdf.js      │──▶│  Cross-check  │────▶│ Results  │
+│  upload  │     │  ref parser  │  │  & merge      │     │ + enrich │
+└──────────┘     └──────────────┘  └───────────────┘     └──────────┘
+
+                         Backward: ← articles cited by the input
+                         Forward:  → articles that cite the input
 ```
 
 ## Usage
 
 ### Option 1 — Open directly
 
-Open `index.html` in any modern browser. No server needed — everything runs client-side.
+Open `index.html` in any modern browser. No server needed.
 
 ### Option 2 — Local server (recommended for development)
 
@@ -51,7 +57,7 @@ python3 -m http.server 8080
 
 ### Option 3 — GitHub Pages
 
-Push to a GitHub repository and enable GitHub Pages on the `main` branch. The tool will be available at `https://<username>.github.io/BackwardSnowballing/`.
+Push to a GitHub repository and enable GitHub Pages on the `main` branch.
 
 ## Project structure
 
@@ -60,10 +66,10 @@ snowball/
 ├── index.html       # HTML shell, CSS, footer
 ├── js/
 │   ├── utils.js     # Shared utilities (DOI cleaning, string similarity, dedup)
-│   ├── api.js       # API interactions (Crossref, OpenAlex, Semantic Scholar) + forward chasing
+│   ├── api.js       # API interactions (Crossref, OpenAlex, Semantic Scholar) + forward snowballing
 │   ├── pdf.js       # PDF text extraction & reference section parsing
 │   ├── merge.js     # Cross-check & merge logic (PDF refs + API refs)
-│   ├── ui.js        # Rendering (results list, filter, CSV/RIS export, COinS, article card)
+│   ├── ui.js        # Rendering (results list, filters, CSV/RIS export, COinS, article card)
 │   ├── main.js      # App initialization, UI wiring, single-article extraction pipeline
 │   └── batch.js     # Batch DOI processing with per-article tabs
 ├── LICENSE          # MIT
@@ -71,28 +77,29 @@ snowball/
 └── README.md
 ```
 
-## Limitations
+## Known limitations
 
-- PDF parsing is heuristic-based and may not work perfectly on all reference formats or heavily formatted PDFs
-- API coverage depends on the publisher: some publishers deposit complete reference lists in Crossref, others don't
-- The Crossref DOI resolution for individual references is rate-limited; large reference lists may take a moment
-- All processing is client-side: no data is sent to any server other than the public APIs (Crossref, OpenAlex, Semantic Scholar)
+- **PDF parsing is heuristic-based** and may not work perfectly on all reference formats. Heavily stylized or scanned PDFs will perform poorly. Two-column detection works well for standard academic layouts (Springer, Elsevier, IEEE, etc.) but edge cases exist.
+- **API coverage depends on the publisher.** Some publishers deposit complete reference lists in Crossref, others deposit partial or no reference metadata. OpenAlex and Semantic Scholar complement each other but neither is 100% complete.
+- **Occasional false positives from incorrect DOIs in source metadata.** Some publishers deposit truncated or erroneous DOIs in their Crossref reference lists. For example, a DOI missing its last digits may resolve to a completely unrelated article in the same journal volume. These errors originate from the publisher's metadata deposit, not from this tool. If you spot an obviously unrelated reference (e.g., a paper on agricultural contamination appearing in a firefighter study), it is likely caused by such a metadata error.
+- **Crossref rate limiting.** The DOI enrichment step queries Crossref's bibliographic search for each reference without a DOI. For articles with many references, this may trigger rate limits (HTTP 429). The tool uses the Crossref polite pool (`mailto` parameter) and retries with backoff, but very large batches may experience delays.
+- **Forward snowballing completeness.** The number of citing articles depends on what OpenAlex and Semantic Scholar have indexed. Very recent articles (< 1 week old) may not yet appear. Coverage varies by discipline.
 
 ## Third-party APIs & data
 
-This tool queries the following external APIs at runtime. No API keys are required for basic usage, but please review their terms:
+This tool queries the following external APIs at runtime. No API keys are required.
 
 | Service | Data license | Attribution | Terms |
 |---------|-------------|-------------|-------|
-| [Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/) | Public metadata, no formal data license | Not required | [Etiquette & rate limits](https://github.com/CrossRef/rest-api-doc#etiquette). Include `mailto` for polite pool access. |
+| [Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/) | Public metadata | Not required | [Etiquette & rate limits](https://github.com/CrossRef/rest-api-doc#etiquette). Uses `mailto` for polite pool. |
 | [OpenAlex API](https://docs.openalex.org/) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | Appreciated but not required | [Terms of Service](https://openalex.org/OpenAlex_termsofservice.pdf). Free, 100k requests/day. |
-| [Semantic Scholar API](https://www.semanticscholar.org/product/api) | [API License Agreement](https://www.semanticscholar.org/product/api/license) | **Required for public display** — must link back to semanticscholar.org | Non-commercial research/educational use. 100 req / 5 min without API key. |
+| [Semantic Scholar API](https://www.semanticscholar.org/product/api) | [API License Agreement](https://www.semanticscholar.org/product/api/license) | **Required for public display** | Non-commercial research/educational use. 100 req / 5 min without API key. |
 
 **Privacy note:** All processing is client-side. PDFs are never uploaded to any server. The only network requests are to the APIs listed above, using the article's DOI and reference metadata as query parameters.
 
 ### Semantic Scholar attribution
 
-As required by the Semantic Scholar API License Agreement, when data from Semantic Scholar is displayed publicly:
+As required by the Semantic Scholar API License Agreement:
 
 > Data source: [Semantic Scholar API](https://www.semanticscholar.org/?utm_source=api)
 

@@ -1,9 +1,11 @@
-# Snowball — Backward Reference Extractor
+# Snowball — Backward-Forward Snowballing
 
-A client-side web tool for **backward snowballing** in systematic reviews. Given a DOI, a PDF, or both, it extracts the full list of cited references with titles, authors, years, and clickable DOIs.
+A client-side web tool for **backward and forward snowballing** in systematic reviews. Given a DOI, a PDF, or both, it extracts referenced articles (backward) and citing articles (forward) with titles, authors, years, and clickable DOIs.
 
 ## Features
 
+- **Backward citation chasing** — extracts all references cited by an article
+- **Forward citation chasing** — finds all articles that cite the input article (via OpenAlex & Semantic Scholar)
 - **DOI lookup** — queries Crossref, OpenAlex & Semantic Scholar APIs simultaneously, picks the best source and supplements with unique refs from the others
 - **PDF extraction** — parses reference sections from PDFs using pdf.js, with support for:
   - Two-column layouts (auto-detected)
@@ -12,8 +14,11 @@ A client-side web tool for **backward snowballing** in systematic reviews. Given
   - Hyphenation and line-break healing
 - **Cross-check & merge** — when both DOI and PDF are provided, the tool merges both reference sets, filling gaps from each source
 - **DOI resolution** — references without a DOI are automatically looked up via the Crossref bibliographic search API
+- **Batch processing** — paste multiple DOIs and process them all sequentially, with per-article tabs and combined export
+- **Export** — RIS (Zotero/Mendeley/EndNote compatible), CSV, or copy all DOIs to clipboard
+- **Zotero integration** — embedded COinS metadata for direct import via the Zotero browser connector
 - **Article info card** — displays metadata (title, authors, journal, year) of the article being analyzed
-- **Export** — filter references, export to CSV, or copy all DOIs to clipboard
+- **Zero setup** — no account, no API key, no server. Everything runs client-side in the browser.
 
 ## How it works
 
@@ -55,11 +60,12 @@ snowball/
 ├── index.html       # HTML shell, CSS, footer
 ├── js/
 │   ├── utils.js     # Shared utilities (DOI cleaning, string similarity, dedup)
-│   ├── api.js       # API interactions (Crossref, OpenAlex, Semantic Scholar)
+│   ├── api.js       # API interactions (Crossref, OpenAlex, Semantic Scholar) + forward chasing
 │   ├── pdf.js       # PDF text extraction & reference section parsing
 │   ├── merge.js     # Cross-check & merge logic (PDF refs + API refs)
-│   ├── ui.js        # Rendering (results list, filter, CSV export, article card)
-│   └── main.js      # App initialization, UI wiring, extraction pipeline
+│   ├── ui.js        # Rendering (results list, filter, CSV/RIS export, COinS, article card)
+│   ├── main.js      # App initialization, UI wiring, single-article extraction pipeline
+│   └── batch.js     # Batch DOI processing with per-article tabs
 ├── LICENSE          # MIT
 ├── .gitignore
 └── README.md

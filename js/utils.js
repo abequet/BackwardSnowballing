@@ -14,7 +14,10 @@ function esc(s) {
 }
 
 function setStatus(t, m) {
-  const e = document.getElementById('status');
+  // Target the right status div depending on active mode
+  const batchPanel = document.getElementById('panelBatch');
+  const isBatch = batchPanel && batchPanel.classList.contains('active');
+  const e = document.getElementById(isBatch ? 'batchStatus' : 'status');
   e.className = 'status ' + t;
   e.innerHTML = (t === 'loading' ? '<div class="spinner"></div>' : '') + `<span>${m}</span>`;
 }

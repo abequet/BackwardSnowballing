@@ -4,6 +4,8 @@
 
 let allRefs = [];
 let pendingPDFFile = null;
+let lastBackwardRefs = [];
+let lastForwardRefs = [];
 
 // ── DOM refs ──
 const dz = document.getElementById('dropzone');
@@ -37,7 +39,25 @@ function resetPreviousResults() {
   document.getElementById('results').innerHTML = '';
   document.getElementById('articleCard').style.display = 'none';
   document.getElementById('status').className = 'status';
+  const dt = document.getElementById('directionTabs');
+  if (dt) dt.style.display = 'none';
   allRefs = [];
+  lastBackwardRefs = [];
+  lastForwardRefs = [];
+}
+
+// ── Direction sub-tabs (backward / forward) ──
+function showDirection(dir) {
+  document.querySelectorAll('.dir-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.dir === dir);
+  });
+  if (dir === 'backward') {
+    allRefs = lastBackwardRefs;
+    renderResults(lastBackwardRefs, '← Backward — Cited References');
+  } else {
+    allRefs = lastForwardRefs;
+    renderResults(lastForwardRefs, '→ Forward — Citing Articles');
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -51,11 +71,15 @@ async function runExtraction() {
 
   document.getElementById('results').innerHTML = '';
   document.getElementById('articleCard').style.display = 'none';
+  const dt = document.getElementById('directionTabs');
+  if (dt) dt.style.display = 'none';
   let apiRefs = [], pdfRefs = [], pdfDOI = null, pdfFirstPageText = '';
+  lastBackwardRefs = [];
+  lastForwardRefs = [];
 
   // ── Step 1: PDF ──
   if (hasPDF) {
-    setStatus('loading', 'Step 1/3 — Extracting references from PDF…');
+    setStatus('loading', 'Step 1 — Extracting references from PDF…');
     try {
       const result = await extractFromPDF(pendingPDFFile);
       pdfRefs = result.refs;
@@ -75,35 +99,57 @@ async function runExtraction() {
     if (info.title) showArticleCard(info);
   }
 
-  // ── Step 2: APIs ──
+  // ── Step 2: Backward — references cited by this article ──
   if (doi) {
-    setStatus('loading', `Step 2/3 — Querying APIs for DOI ${doi}…`);
+    setStatus('loading', 'Step 2 — Backward: querying APIs for referenced articles…');
     apiRefs = await fetchFromAPIs(doi);
   }
 
-  // ── Step 3: Cross-check & merge ──
-  setStatus('loading', 'Step 3/3 — Cross-checking and merging results…');
+  setStatus('loading', 'Cross-checking and merging backward results…');
   const merged = mergeRefSets(pdfRefs, apiRefs);
 
   if (merged.length) {
-    allRefs = merged;
-    renderResults(merged);
-
     const noDoi = merged.filter(r => !r.doi).length;
     if (noDoi > 0) {
       setStatus('loading', `Resolving DOIs for ${noDoi} references via Crossref…`);
       await enrichRefsWithDOIs(merged);
-      allRefs = merged;
-      renderList(merged);
+    }
+  }
+  lastBackwardRefs = merged;
+
+  // ── Step 3: Forward — articles that cite this one ──
+  let forwardRefs = [];
+  if (doi) {
+    setStatus('loading', 'Step 3 — Forward: searching for citing articles…');
+    forwardRefs = await fetchCitingArticles(doi);
+  }
+  lastForwardRefs = forwardRefs;
+
+  // ── Display results ──
+  const hasBackward = lastBackwardRefs.length > 0;
+  const hasForward = lastForwardRefs.length > 0;
+
+  if (hasBackward || hasForward) {
+    // Show direction tabs
+    if (dt) {
+      dt.style.display = 'flex';
+      dt.innerHTML =
+        `<button class="dir-tab active" data-dir="backward" onclick="showDirection('backward')">← Backward <span class="dir-count">${lastBackwardRefs.length}</span></button>` +
+        `<button class="dir-tab" data-dir="forward" onclick="showDirection('forward')">→ Forward <span class="dir-count">${lastForwardRefs.length}</span></button>`;
     }
 
-    const withDoi = merged.filter(r => r.doi).length;
+    // Default to backward view
+    allRefs = lastBackwardRefs;
+    renderResults(lastBackwardRefs, '← Backward — Cited References');
+
     const sources = [];
     if (pdfRefs.length) sources.push(`PDF: ${pdfRefs.length}`);
     if (apiRefs.length) sources.push(`API: ${apiRefs.length}`);
+    const backDoi = lastBackwardRefs.filter(r => r.doi).length;
     setStatus('success',
-      `${merged.length} unique references found. ${withDoi} with DOI. ` +
-      `<span class="source-badge">${sources.join(' · ')} → merged</span>`);
+      `Backward: ${lastBackwardRefs.length} refs (${backDoi} with DOI). ` +
+      `Forward: ${lastForwardRefs.length} citing articles. ` +
+      `<span class="source-badge">${sources.join(' · ')}</span>`);
   } else {
     setStatus('warn', 'No references found. Check the DOI or try a different PDF.');
   }
